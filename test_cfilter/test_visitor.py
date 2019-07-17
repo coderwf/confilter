@@ -14,7 +14,7 @@ class TestVisitor:
     def test_string_literal(self):
         assert Filter("\"jack\"").visit_res() == "jack"
         assert Filter("'jack'").visit_res() == "jack"
-        assert Filter("'字节跳动'").visit_res() == "字节跳动"
+        assert Filter("'中文'").visit_res() == "中文"
 
     # 数字
     def test_decimal_literal(self):
