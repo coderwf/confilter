@@ -1,123 +1,253 @@
 # -*- coding: utf-8 -*-
 from cfilter.fantlr.CFilterVisitor import CFilterVisitor
-from cfilter.fantlr.CFilterParser import CFilterParser
+from cfilter.fantlr.CFilter import CFilter
+from cfilter.visitor.errors import FuncNotFound, IdentifierNotFound
 from cfilter.funcs.service import FuncService
+from cfilter.fantlr.CFLexer import CFLexer
 
 
 class MyVisitor(CFilterVisitor):
 
+    logic_op_map = {
+        CFLexer.AND: "and",
+        CFLexer.OR: "or",
+        CFLexer.XOR: "xor",
+
+    }
+
     def __init__(self):
         super(CFilterVisitor, self).__init__()
-        self.data_source = None
+        self._data = None
 
-    def visit_res(self, tree, data_source=None):
+    def visit_res(self, tree, data=None):
         """
-
+        设置data,包含变量值
         :param tree:
-        :param data_source:  dict {"employee_id": 1, "working_hour_type: 3}
+        :param data: {"a": 1, "b": 3}
         :return:
         """
-        self.data_source = data_source
+        self._data = data
         return self.visit(tree)
 
-    def visitCfilter(self, ctx: CFilterParser.CfilterContext):
-        statement = ctx.expressionStatement()
+    def visitRoot(self, ctx: CFilter.RootContext):
+        """
+
+        :param ctx:
+        :return: return True if empty
+        """
+        statement = ctx.statement()
         if statement is None:
             return True
+        return self.visit(ctx.statement())
 
-        return self.visit(statement)
+    def visitStatement(self, ctx: CFilter.StatementContext):
+        """
 
-    def visitExpressionStatement(self, ctx: CFilterParser.ExpressionStatementContext):
+        :param ctx:
+        :return:
+        """
         return self.visit(ctx.expression())
 
-    # 带符号
-    def visitSignedExpression(self, ctx: CFilterParser.SignedExpressionContext):
-        expression_val = self.visit(ctx.expression())
-        sign_text = ctx.sign().getText()
-        return -expression_val if sign_text == '-' else expression_val
+    def visitParentExpressionAtom(self, ctx: CFilter.ParentExpressionAtomContext):
+        """
 
-    # not expression
-    def visitNotExpression(self, ctx: CFilterParser.NotExpressionContext):
-        return not self.visit(ctx.expression())
+        :param ctx:
+        :return:
+        """
+        return self.visit(ctx.statement())
 
-    # 带括号
-    def visitParentExpression(self, ctx: CFilterParser.ParentExpressionContext):
-        return self.visit(ctx.expression())
+    def visitNotExpression(self, ctx: CFilter.NotExpressionContext):
+        """
 
-    # 第一优先级运算
-    def visitFpMathOperatorExpression(self, ctx: CFilterParser.FpMathOperatorExpressionContext):
+        :param ctx:
+        :return: not expression
+        """
+        value = self.visit(ctx.expression())
+        return not value
+
+    def visitLogicalExpression(self, ctx: CFilter.LogicalExpressionContext):
+        """
+
+        :param ctx:
+        :return: expression logicalOp expression
+        """
         left = self.visit(ctx.expression(0))
         right = self.visit(ctx.expression(1))
-        operator = ctx.firstPrecedenceMathOperator().getText()
+        operator = self.logic_op_map.get(ctx.logicalOp.type)
+        if not FuncService.exists(operator):
+            raise FuncNotFound(operator)
         return FuncService.exec(operator, left, right)
 
-    # 第二优先级运算
-    def visitSpMathOperatorExpression(self, ctx: CFilterParser.SpMathOperatorExpressionContext):
-        left = self.visit(ctx.expression(0))
-        right = self.visit(ctx.expression(1))
-        operator = ctx.secondPrecedenceMathOperator().getText()
+    def visitIsExpression(self, ctx: CFilter.IsExpressionContext):
+        """
+
+        :param ctx:
+        :return: is expression
+        """
+        left = self.visit(ctx.predicate())
+        right = self.visit(ctx.expression())
+
+        if ctx.NOT() is None:
+            return left is right
+        return left is not right
+
+    def visitPredicateExpression(self, ctx: CFilter.PredicateExpressionContext):
+        """
+
+        :param ctx:
+        :return:
+        """
+        return self.visit(ctx.predicate())
+
+    def visitInPredicate(self, ctx: CFilter.InPredicateContext):
+        """
+
+        :param ctx:
+        :return: val in (1, 2, 3)
+        """
+        left = self.visit(ctx.predicate())
+        right = self.visit(ctx.expressions())
+        if ctx.NOT() is None:
+            return left in right
+        return left not in right
+
+    def visitExpressions(self, ctx: CFilter.ExpressionsContext):
+        expressions = tuple(self.visit(expression) for expression in ctx.expression())
+        return expressions
+
+    def visitBinaryComparasionPredicate(self, ctx: CFilter.BinaryComparasionPredicateContext):
+        """
+
+        :param ctx:
+        :return:
+        """
+        operator = ctx.comparisonOperator().getText()
+        left = self.visit(ctx.predicate(0))
+        right = self.visit(ctx.predicate(1))
+        if not FuncService.exists(operator):
+            raise FuncNotFound(operator)
         return FuncService.exec(operator, left, right)
 
-    # 对比
-    def visitCOperatorExpression(self, ctx: CFilterParser.COperatorExpressionContext):
-        left = self.visit(ctx.expression(0))
-        right = self.visit(ctx.expression(1))
-        operator = ctx.compareOperator().getText()
-        return FuncService.exec(operator, left, right)
+    def visitExpressionAtomPredicate(self, ctx: CFilter.ExpressionAtomPredicateContext):
+        """
 
-    # 逻辑运算符
-    def visitLogicAndExpression(self, ctx: CFilterParser.LogicAndExpressionContext):
-        left = self.visit(ctx.expression(0))
-        right = self.visit(ctx.expression(1))
-        operator = ctx.logicalAnd().getText()
-        return FuncService.exec(operator, left, right)
+        :param ctx:
+        :return:
+        """
+        return self.visit(ctx.expressionAtom())
 
-    def visitLogicXorExpression(self, ctx: CFilterParser.LogicXorExpressionContext):
-        left = self.visit(ctx.expression(0))
-        right = self.visit(ctx.expression(1))
-        operator = ctx.logicalXor().getText()
-        return FuncService.exec(operator, left, right)
+    def visitConstantExpressionAtom(self, ctx: CFilter.ConstantExpressionAtomContext):
+        return self.visit(ctx.constant())
 
-    def visitLogicOrExpression(self, ctx: CFilterParser.LogicOrExpressionContext):
-        left = self.visit(ctx.expression(0))
-        right = self.visit(ctx.expression(1))
-        operator = ctx.logicalOr().getText()
-        return FuncService.exec(operator, left, right)
+    def visitConstant(self, ctx: CFilter.ConstantContext):
+        if ctx.stringLiteral() is not None:
+            return ctx.getText()[1: -1]
 
-    # 函数调用
-    def visitFunctionCallExpression(self, ctx: CFilterParser.FunctionCallExpressionContext):
-        func_name = ctx.funcCall().getText()
-        func_args = ctx.functionArgs()
-        if func_args is None:
-            return FuncService.exec(func_name)
-        return FuncService.exec(func_name, *self.visit(func_args))
+        val = self.visit(ctx.decimalLiteral())
+        if ctx.getText().startswith("-"):
+            return -val
+        return val
 
-    def visitFunctionArgs(self, ctx: CFilterParser.FunctionArgsContext):
-        return tuple(self.visit(expression) for expression in ctx.expression())
+    def visitDecimalLiteral(self, ctx: CFilter.DecimalLiteralContext):
+        """
 
-    # 数字
-    def visitLiteralExpression(self, ctx: CFilterParser.LiteralExpressionContext):
-        return self.visit(ctx.decimalLiteral())
+        :param ctx:
+        :return:
+        """
+        str_val = ctx.getText()
+        if ctx.INTEGER_LITERAL() is not None:
+            return int(str_val)
+        return float(str_val)
 
-    # 小数
-    def visitFloatLiteral(self, ctx: CFilterParser.FloatLiteralContext):
-        return float(ctx.getText())
+    def visitIdentifierExpressionAtom(self, ctx: CFilter.IdentifierExpressionAtomContext):
+        """
 
-    # 整数
-    def visitIntegerLiteral(self, ctx: CFilterParser.IntegerLiteralContext):
-        return int(ctx.getText())
-
-    # 变量
-    def visitIdentifier(self, ctx: CFilterParser.IdentifierContext):
+        :param ctx:
+        :return:
+        """
         identifier = ctx.getText()
-        if identifier not in self.data_source:
-            raise Exception("undefined identifier %s" % identifier)
-        return self.data_source.get(identifier)
+        val = self._data and self._data.get(identifier, None)
+        if val is None:
+            raise IdentifierNotFound(identifier)
+        return val
 
-    # 字符串
-    def visitStrLiteralExpression(self, ctx: CFilterParser.StrLiteralExpressionContext):
-        quote_string = ctx.getText()
-        return quote_string[1: -1]
+    def visitFunctionCallExpressionAtom(self, ctx: CFilter.FunctionCallExpressionAtomContext):
+        """
 
+        :param ctx:
+        :return:
+        """
+        return self.visit(ctx.functionCall())
 
+    def visitFunctionCall(self, ctx: CFilter.FunctionCallContext):
+        """
+
+        :param ctx:
+        :return:
+        """
+        func_name = ctx.ID_LITERAL().getText()
+        args = self.visit(ctx.functionArgs())
+        if not FuncService.exists(func_name):
+            raise FuncNotFound(func_name)
+        return FuncService.exec(func_name, *args)
+
+    def visitFunctionArgs(self, ctx: CFilter.FunctionArgsContext):
+        """
+
+        :param ctx:
+        :return:
+        """
+        function_args = tuple(self.visit(function_arg) for function_arg in ctx.functionArg())
+        return function_args
+
+    def visitFunctionArg(self, ctx: CFilter.FunctionArgContext):
+        """
+
+        :param ctx:
+        :return:
+        """
+        if ctx.constant():
+            return self.visit(ctx.constant())
+        elif ctx.expression():
+            return self.visit(ctx.expression())
+        else:
+            return self.visit(ctx.functionCall())
+
+    def visitUnaryExpressionAtom(self, ctx: CFilter.UnaryExpressionAtomContext):
+        """
+
+        :param ctx:
+        :return:
+        """
+        operator = ctx.unaryOperator().getText()
+        expr_val = self.visit(ctx.expressionAtom())
+        if not FuncService.exists(operator):
+            raise FuncNotFound(operator)
+        return FuncService.exec(operator, expr_val)
+
+    def visitFmathExpressionAtom(self, ctx: CFilter.FmathExpressionAtomContext):
+        """
+
+        :param ctx:
+        :return:
+        """
+        operator = ctx.fMathOperator().getText()
+        left = self.visit(ctx.expressionAtom(0))
+        right = self.visit(ctx.expressionAtom(1))
+        if not FuncService.exists(operator):
+            raise FuncNotFound(operator)
+        return FuncService.exec(operator, left, right)
+
+    def visitSmathExpressionAtom(self, ctx: CFilter.SmathExpressionAtomContext):
+        """
+
+        :param ctx:
+        :return:
+        """
+        operator = ctx.sMathOperator().getText()
+        left = self.visit(ctx.expressionAtom(0))
+        right = self.visit(ctx.expressionAtom(1))
+        if not FuncService.exists(operator):
+            raise FuncNotFound(operator)
+        return FuncService.exec(operator, left, right)
 

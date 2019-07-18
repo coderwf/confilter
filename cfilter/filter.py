@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import antlr4
-from cfilter.fantlr.CFilterLexer import CFilterLexer
-from cfilter.fantlr.CFilterParser import CFilterParser
+from cfilter.fantlr.CFLexer import CFLexer
+from cfilter.fantlr.CFilter import CFilter
 from cfilter.visitor.myvisitor import MyVisitor
 from cfilter.visitor.elistener import FilterErrorListener
 
@@ -9,11 +9,11 @@ from cfilter.visitor.elistener import FilterErrorListener
 class Filter:
     def __init__(self, rule):
         stream = antlr4.InputStream(rule)
-        fl = CFilterLexer(stream)
+        fl = CFLexer(stream)
         fl.removeErrorListeners()
         fl.addErrorListener(FilterErrorListener.INSTANCE)
         token_stream = antlr4.CommonTokenStream(fl)
-        tree = CFilterParser(token_stream)
+        tree = CFilter(token_stream)
 
         tree.removeErrorListeners()
         tree.addErrorListener(FilterErrorListener.INSTANCE)
@@ -22,7 +22,7 @@ class Filter:
 
     def visit_res(self, data=None):
         self.tree.reset()
-        return self.visitor.visit_res(self.tree.cfilter(), data_source=data)
+        return self.visitor.visit_res(self.tree.root(), data=data)
 
     def _filter_dict(self, data_source):
         new_data_source = dict()
@@ -53,6 +53,4 @@ class Filter:
 
 
 if __name__ == "__main__":
-    rule_1 = "not (a='综合工时' and b!='实习') "
-    Filter(rule_1).visit_res({"a": "综合工时", "b": "实习"})
-    print(Filter("1 or 1 and 0").visit_res())
+    pass

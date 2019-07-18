@@ -1,10 +1,6 @@
 # -*- coding: utf-8 -*-
 from antlr4.error.ErrorListener import ErrorListener
-
-
-class FilterSyntaxError(Exception):
-    def __init__(self, line, column, msg):
-        self.msg = "line:%s, column:%s with %s" % (line, column, msg)
+from cfilter.visitor.errors import FilterSyntaxError
 
 
 class FilterErrorListener(ErrorListener):

@@ -9,7 +9,11 @@ class FuncService:
 
     @staticmethod
     def register(name, func):
-        FuncService.funcs_map[name] = func
+        FuncService.funcs_map[name.lower()] = func
+
+    @staticmethod
+    def exists(name):
+        return name in FuncService.funcs_map
 
     @staticmethod
     def unregister(name):
