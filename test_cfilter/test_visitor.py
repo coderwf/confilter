@@ -97,3 +97,20 @@ class TestVisitor:
         assert Filter("((1+2)*3 + (2+3)*5)*2").visit_res() == 68
         assert Filter("(4*5+2)%3").visit_res() == 1
         assert Filter("5 % 3 * (2 + 1)").visit_res() == 6
+
+    def test_in(self):
+        rule = "a in (1, 2, 3, b, c, d)"
+        assert Filter(rule).visit_res({"a": 1, "b": 4, "c": 5, "d": 6}) is True
+        no_rule = "a not in (1, 2, 3, b, c, d)"
+        assert Filter(no_rule).visit_res({"a": 1, "b": 4, "c": 5, "d": 6}) is False
+
+    def test_nexted(self):
+        FuncService.register("ad", lambda x, y: x + y)
+        rule = "ad(1, ad(2, ad(c, ad(a, b))))"
+        assert Filter(rule).visit_res({"a": 1, "b": 2, "c": 4}) == 10
+        FuncService.unregister("ad")
+
+    def test_not(self):
+        assert Filter("1 is 1").visit_res() is True
+        assert Filter("1 is not 1").visit_res() is False
+        assert Filter("1 is not 2").visit_res() is True
