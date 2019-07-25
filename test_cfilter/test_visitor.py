@@ -114,3 +114,61 @@ class TestVisitor:
         assert Filter("1 is 1").visit_res() is True
         assert Filter("1 is not 1").visit_res() is False
         assert Filter("1 is not 2").visit_res() is True
+
+    def test_var(self):
+        assert Filter("a > b").visit_res({"a": 2, "b": 1}) is True
+        assert Filter("a > b").visit_res({"a": 1, "b": 2}) is False
+        assert Filter("a is b").visit_res({"a": 2, "b": 1}) is False
+        assert Filter("a is not b").visit_res({"a": 2, "b": 1}) is True
+        assert Filter("a is b").visit_res({"a": 1, "b": 1}) is True
+
+        f = Filter("1")
+        assert f.visit_res() == 1
+        assert f.visit_res() == 1
+
+        f = Filter("1 in (1, 2, 3)")
+        assert f.visit_res() is True
+        assert f.visit_res() is True
+        assert f.visit_res() is True
+
+        f = Filter("(1 + 1) in (a, b, 4, 6)")
+        assert f.visit_res({"a": 2, "b": 5}) is True
+        assert f.visit_res({"a": 7, "b": 5}) is False
+
+        assert Filter("0 and a").visit_res({"a": 1}) is False
+        assert Filter("1 and a").visit_res({"a": 1}) is True
+        assert Filter("1 and a").visit_res({"a": 0}) is False
+
+        assert Filter("1 or a").visit_res({"a": 1}) is True
+        assert Filter("0 or a").visit_res({"a": 1}) is True
+        assert Filter("0 or a").visit_res({"a": 0}) is False
+
+        assert Filter("a and b or not c").visit_res({"a": 0, "b": 1, "c": 1}) is False
+        assert Filter("(a and b) or (not c)").visit_res({"a": 0, "b": 1, "c": 1}) is False
+        assert Filter("a or b and c").visit_res({"a": 1, "b": 1, "c": 0}) is True
+
+        assert Filter("not not not a").visit_res({"a": 1}) is False
+        assert Filter("a and b or c and d").visit_res({"a": 1, "b": 0, "c": 1, "d": 0}) is False
+
+        assert Filter("not a or b").visit_res({"a": 1, "b": 1}) is True
+        assert Filter("not (a or b)").visit_res({"a": 1, "b": 1}) is False
+
+        assert Filter("not a and b").visit_res({"a": 0, "b": 0}) is False
+        assert Filter("not (a and b)").visit_res({"a": 0, "b": 0}) is True
+
+        assert Filter("1 + a and 0").visit_res({"a": 3}) is False
+        assert Filter("a * b and c").visit_res({"a": 1, "b": 3, "c": 0}) is False
+
+        assert Filter("a > b and c").visit_res({"a": 3, "b": 1, "c": 0}) is False
+        assert Filter("a > 1 and b").visit_res({"a": 3, "b": 1}) is True
+        assert Filter("a > 1 or b").visit_res({"a": 3, "b": 0}) is True
+
+        assert Filter("a > 1 and 4 > b").visit_res({"a": 3, "b": 2}) is True
+        assert Filter("a + 4 < 5 and b + 1 < c").visit_res({"a": 3, "b": 2, "c": 2}) is False
+        assert Filter("a + 4 < b or 2 + c > 2").visit_res({"a": 3, "b": 5, "c": 1}) is True
+
+        assert Filter("a xor b").visit_res({"a": 1, "b": 0}) is True
+
+        assert Filter("a xor b").visit_res({"a": 1, "b": 1}) is False
+
+        assert Filter("a + b").visit_res(value_map=None, a=1, b=4) == 5
