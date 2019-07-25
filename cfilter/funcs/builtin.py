@@ -44,5 +44,8 @@ builtin_funcs = {
     "int": lambda x: int(x),
     "float": lambda x: float(x),
     "str": lambda x: str(x),
+    "bool": lambda x: bool(x),
 
+    "in": lambda x, y: x in y,
+    "not_in": lambda x, y: x not in y,
 }
