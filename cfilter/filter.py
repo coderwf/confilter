@@ -102,4 +102,5 @@ if __name__ == "__main__":
     print(time.time() - t)
     # 0.6s
 
-
+    print(Filter("a and b and c").variables)
+    # {'b', 'a', 'c'}
