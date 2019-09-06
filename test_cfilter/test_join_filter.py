@@ -15,7 +15,7 @@ class TestJoinFilter:
         assert (Filter("a") | Filter("0")).visit_res(a=1) is True
 
         assert (Filter("a") | Filter("b")).visit_res(a=0, b=2) is True
-        
+
     def test_and(self):
         assert (Filter("0") & Filter("1")).visit_res() is False
         assert (Filter("0") & Filter("0")).visit_res() is False
